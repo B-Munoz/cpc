@@ -35,15 +35,13 @@ class ExpenseManager:
             except Exception:
                 return pd.DataFrame(columns=["id", "Date", "Category", "Description", "Amount"])
 
+    # IN FILE: classes.py -> Inside ExpenseManager class
+
     def save_bulk_data(self, df):
-        """
-        Safely updates the database without dropping the table.
-        Strategy: Truncate (Delete all) -> Append. 
-        This preserves the Table Schema (Primary Keys, constraints).
-        """
         with self.get_connection() as conn:
-            conn.execute("DELETE FROM expenses") 
-            df.to_sql("expenses", conn, if_exists="append", index=False)
+            with conn: # <--- CRITICAL: Starts a transaction block
+                conn.execute("DELETE FROM expenses") 
+                df.to_sql("expenses", conn, if_exists="append", index=False)
 
     def add_expense(self, category, description, amount):
         """Inserts a single row letting SQL handle the Timestamp and ID."""
@@ -54,17 +52,20 @@ class ExpenseManager:
             )
         return self.load_data()
 
-    def calculate_metrics(self, df):
+    @staticmethod # Static methods don't need self to work
+    def calculate_metrics(df):
         if df.empty:
             return 0, 0
         return df["Amount"].sum(), len(df)
     
-    def get_expenses_by_category(self, df):
+    @staticmethod
+    def get_expenses_by_category(df):
         if df.empty:
             return pd.Series()
         return df.groupby("Category")["Amount"].sum()
     
-    def get_category_matrix(self, df, categories):
+    @staticmethod
+    def get_category_matrix(df, categories):
         data_dict = {}
         max_len = 0
         
@@ -73,8 +74,76 @@ class ExpenseManager:
             data_dict[cat] = amounts
             max_len = max(max_len, len(amounts))
             
-        # Pad lists
         for cat in data_dict:
             data_dict[cat] += [None] * (max_len - len(data_dict[cat]))
             
         return pd.DataFrame(data_dict)
+
+
+class BudgetManager:
+    def __init__(self, db_path, limits):
+        self.db_path = db_path
+        self.limits = limits  # Dictionary from config.py
+        self.init_db()
+
+    def get_connection(self):
+        return sqlite3.connect(self.db_path)
+
+    def init_db(self):
+        """Creates the budgets table to track current balances."""
+        with self.get_connection() as conn:
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS budgets (
+                    category TEXT PRIMARY KEY,
+                    current_balance REAL DEFAULT 0
+                )
+            """)
+            # Initialize categories if they don't exist
+            for cat in self.limits.keys():
+                conn.execute(
+                    "INSERT OR IGNORE INTO budgets (category, current_balance) VALUES (?, 0)",
+                    (cat,)
+                )
+
+    def get_balances(self):
+        """Returns a dict {category: current_balance}."""
+        with self.get_connection() as conn:
+            rows = conn.execute("SELECT category, current_balance FROM budgets").fetchall()
+            return dict(rows)
+
+    def allocate_income(self, income_amount):
+        """
+        Distributes income into categories based on limits.
+        Returns a dict of {category: amount_added}.
+        """
+        balances = self.get_balances()
+        allocations = {}
+        remaining_income = income_amount
+
+        with self.get_connection() as conn:
+            # Iterate through categories in the order defined in config.py
+            for category, limit in self.limits.items():
+                if remaining_income <= 0:
+                    break
+
+                current_bal = balances.get(category, 0)
+                
+                # If limit is 0, it means 'unlimited' (e.g., Savings).
+                if limit == 0:
+                    added_amount = remaining_income
+                else:
+                    space_available = limit - current_bal
+                    if space_available <= 0:
+                        continue # Bucket is full, skip to next
+                    added_amount = min(remaining_income, space_available)
+
+                # Update memory and DB
+                remaining_income -= added_amount
+                allocations[category] = added_amount
+                
+                conn.execute(
+                    "UPDATE budgets SET current_balance = current_balance + ? WHERE category = ?",
+                    (added_amount, category)
+                )
+        
+        return allocations
