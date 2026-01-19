@@ -76,6 +76,7 @@ class FinanceManager:
         print(self.df)
         print("\nTotal by Category:")
         print(self.df.groupby("Category")["Amount"].sum())
+    
 
 def main():
     manager = FinanceManager()

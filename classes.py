@@ -53,3 +53,28 @@ class ExpenseManager:
                 (datetime.now(), category, description, amount)
             )
         return self.load_data()
+
+    def calculate_metrics(self, df):
+        if df.empty:
+            return 0, 0
+        return df["Amount"].sum(), len(df)
+    
+    def get_expenses_by_category(self, df):
+        if df.empty:
+            return pd.Series()
+        return df.groupby("Category")["Amount"].sum()
+    
+    def get_category_matrix(self, df, categories):
+        data_dict = {}
+        max_len = 0
+        
+        for cat in categories:
+            amounts = df[df["Category"] == cat]["Amount"].tolist()
+            data_dict[cat] = amounts
+            max_len = max(max_len, len(amounts))
+            
+        # Pad lists
+        for cat in data_dict:
+            data_dict[cat] += [None] * (max_len - len(data_dict[cat]))
+            
+        return pd.DataFrame(data_dict)

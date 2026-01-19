@@ -1,63 +1,9 @@
 import streamlit as st
-import pandas as pd
-import sqlite3
-from datetime import datetime
+from classes import ExpenseManager
 
 # --- Configuration & Setup ---
 DB_PATH = "expenses.db"
 CATEGORIES = ["Transporte", "Vivienda", "Misceláneo"]
-
-class ExpenseManager:
-    def __init__(self, db_path):
-        self.db_path = db_path
-        self.init_db()
-
-    def get_connection(self):
-        return sqlite3.connect(self.db_path)
-
-    def init_db(self):
-        """
-        Initializes the table with a Primary Key.
-        BEST PRACTICE: Always use an ID column for reliable row referencing.
-        """
-        with self.get_connection() as conn:
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS expenses (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    Date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    Category TEXT,
-                    Description TEXT,
-                    Amount REAL
-                )
-            """)
-
-    def load_data(self):
-        """Loads data including the ID, but keeps it hidden in UI later."""
-        with self.get_connection() as conn:
-            try:
-                df = pd.read_sql("SELECT * FROM expenses", conn, parse_dates=["Date"])
-                return df
-            except Exception:
-                return pd.DataFrame(columns=["id", "Date", "Category", "Description", "Amount"])
-
-    def save_bulk_data(self, df):
-        """
-        Safely updates the database without dropping the table.
-        Strategy: Truncate (Delete all) -> Append. 
-        This preserves the Table Schema (Primary Keys, constraints).
-        """
-        with self.get_connection() as conn:
-            conn.execute("DELETE FROM expenses") 
-            df.to_sql("expenses", conn, if_exists="append", index=False)
-
-    def add_expense(self, category, description, amount):
-        """Inserts a single row letting SQL handle the Timestamp and ID."""
-        with self.get_connection() as conn:
-            conn.execute(
-                "INSERT INTO expenses (Date, Category, Description, Amount) VALUES (?, ?, ?, ?)",
-                (datetime.now(), category, description, amount)
-            )
-        return self.load_data()
 
 # Instanciamos el manager
 manager = ExpenseManager(DB_PATH)
@@ -87,16 +33,16 @@ if st.session_state.df.empty:
     st.info("Start by adding expenses in the sidebar!")
 else:
     # 1. Metrics Row
-    total_spent = st.session_state.df["Amount"].sum()
+    total_spent, total_count = manager.calculate_metrics(st.session_state.df)
     col1, col2 = st.columns(2)
-    col1.metric("Total Spent", f"${total_spent:,.2f}")
+    col1.metric("Total Spent", f"${total_spent}")
     col2.metric("Total Transactions", len(st.session_state.df))
 
     # 2. Charts
     st.subheader("Expenses by Category")
     # Grouping by category for visual
     if not st.session_state.df.empty:
-        chart_data = st.session_state.df.groupby("Category")["Amount"].sum()
+        chart_data = manager.get_expenses_by_category(st.session_state.df)
         st.bar_chart(chart_data)
 
     # 3. Data Table (Editable)
@@ -126,19 +72,7 @@ else:
     st.subheader("Category Matrix View")
     st.caption("Each column represents a category, showing individual transaction amounts.")
     
-    data_dict = {}
-    max_len = 0
-    
-    for cat in CATEGORIES:
-        amounts = st.session_state.df[st.session_state.df["Category"] == cat]["Amount"].tolist()
-        data_dict[cat] = amounts
-        max_len = max(max_len, len(amounts))
-    
-    # Pad lists to same length to create a DataFrame
-    for cat in data_dict:
-        data_dict[cat] += [None] * (max_len - len(data_dict[cat]))
-        
-    compact_df = pd.DataFrame(data_dict)
+    compact_df = manager.get_category_matrix(st.session_state.df, CATEGORIES)
     
     st.dataframe(
         compact_df.style.format("${:.2f}", na_rep=""),
