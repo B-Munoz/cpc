@@ -44,12 +44,19 @@ class ExpenseManager:
                 df.to_sql("expenses", conn, if_exists="append", index=False)
 
     def add_expense(self, category, description, amount):
-        """Inserts a single row letting SQL handle the Timestamp and ID."""
+        """Inserts the expense AND updates the budget balance in one transaction."""
         with self.get_connection() as conn:
+            # 1. Record the Transaction
             conn.execute(
                 "INSERT INTO expenses (Date, Category, Description, Amount) VALUES (?, ?, ?, ?)",
                 (datetime.now(), category, description, amount)
+            )         
+            # 2. Deduct from the Budget Bucket
+            conn.execute(
+                "UPDATE budgets SET current_balance = current_balance - ? WHERE category = ?",
+                (amount, category)
             )
+            
         return self.load_data()
 
     @staticmethod # Static methods don't need self to work
@@ -81,16 +88,15 @@ class ExpenseManager:
 
 
 class BudgetManager:
-    def __init__(self, db_path, limits):
+    def __init__(self, db_path, allocation_map):
         self.db_path = db_path
-        self.limits = limits  # Dictionary from config.py
+        self.allocation_map = allocation_map # Now using percentages
         self.init_db()
 
     def get_connection(self):
         return sqlite3.connect(self.db_path)
 
     def init_db(self):
-        """Creates the budgets table to track current balances."""
         with self.get_connection() as conn:
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS budgets (
@@ -98,47 +104,35 @@ class BudgetManager:
                     current_balance REAL DEFAULT 0
                 )
             """)
-            # Initialize categories if they don't exist
-            for cat in self.limits.keys():
+            # Ensure all categories in config exist in DB
+            for cat in self.allocation_map.keys():
                 conn.execute(
                     "INSERT OR IGNORE INTO budgets (category, current_balance) VALUES (?, 0)",
                     (cat,)
                 )
 
     def get_balances(self):
-        """Returns a dict {category: current_balance}."""
         with self.get_connection() as conn:
             rows = conn.execute("SELECT category, current_balance FROM budgets").fetchall()
             return dict(rows)
 
     def allocate_income(self, income_amount):
         """
-        Distributes income into categories based on limits.
-        Returns a dict of {category: amount_added}.
+        Distributes income based on fixed percentages.
         """
-        balances = self.get_balances()
         allocations = {}
-        remaining_income = income_amount
+        
+        # Validation: Warn if config doesn't sum to 1.0 (Optional but recommended)
+        total_pct = sum(self.allocation_map.values())
+        if not (0.99 <= total_pct <= 1.01):
+            print(f"WARNING: Allocation percentages sum to {total_pct}, not 1.0")
 
         with self.get_connection() as conn:
-            # Iterate through categories in the order defined in config.py
-            for category, limit in self.limits.items():
-                if remaining_income <= 0:
-                    break
-
-                current_bal = balances.get(category, 0)
-                
-                # If limit is 0, it means 'unlimited' (e.g., Savings).
-                if limit == 0:
-                    added_amount = remaining_income
-                else:
-                    space_available = limit - current_bal
-                    if space_available <= 0:
-                        continue # Bucket is full, skip to next
-                    added_amount = min(remaining_income, space_available)
-
-                # Update memory and DB
-                remaining_income -= added_amount
+            for category, pct in self.allocation_map.items():
+                if pct == 0:
+                    continue
+                    
+                added_amount = income_amount * pct
                 allocations[category] = added_amount
                 
                 conn.execute(

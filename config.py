@@ -6,11 +6,24 @@ CATEGORY_CONFIG = {
     "Vivienda": 1500000,
     "Ocio" : 400000,
     "Salud" : 300000,
+    "Ropa" : 300000,
     "Misceláneo": 1000000,
     "Departamento" : 700000,
     "Ahorro": 0,
     "Vacaciones": 0
       
+}
+
+ALLOCATION_PCT = {
+    "Transporte": 0.08,  
+    "Vivienda": 0.30,     
+    "Ocio": 0.09,
+    "Salud": 0.02,
+    "Ropa" : 0.02,
+    "Misceláneo": 0.24,
+    "Departamento": 0.05,
+    "Ahorro": 0.15,
+    "Vacaciones": 0.05
 }
 
 def get_categories():

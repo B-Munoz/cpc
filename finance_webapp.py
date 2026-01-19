@@ -5,7 +5,7 @@ import config
 CATEGORIES = config.get_categories()
 # Instanciamos los managers
 expense_manager = ExpenseManager(config.DB_PATH)
-budget_manager = BudgetManager(config.DB_PATH, config.CATEGORY_CONFIG)
+budget_manager = BudgetManager(config.DB_PATH, config.ALLOCATION_PCT)
 
 st.set_page_config(page_title="Finance Manager", page_icon="💰")
 st.title("💰 Personal Finance Manager")
