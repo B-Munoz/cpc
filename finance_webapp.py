@@ -60,24 +60,21 @@ else:
     cols = st.columns(3) 
     
     for i, (category, limit) in enumerate(config.CATEGORY_CONFIG.items()):
-        current = balances.get(category, 0.0)
-        
-        # Calculate percentage (handle division by zero if limit is 0)
-        if limit > 0:
-            percent = min(current / limit, 1.0)
-        else:
-            pass
-
-        with cols[i % 3]: 
-            st.metric(
-                label=category, 
-                value=f"${current:,.0f}", 
-                delta=f"Budget: ${limit:,.0f}" if limit > 0 else "Unlimited"
-            )
-            try:
-                st.progress(percent)
-            except:
-                pass
+            current = balances.get(category, 0.0)
+            
+            with cols[i % 3]: 
+                # Display the metric
+                st.metric(
+                    label=category, 
+                    # Note: applied your preferred dot formatting here too
+                    value=f"${current:,.0f}".replace(",", "."), 
+                    delta=f"Goal: ${limit:,.0f}".replace(",", ".") if limit > 0 else "Unlimited"
+                )
+                
+                # ONLY show progress bar if a limit exists (is greater than 0)
+                if limit > 0:
+                    percent = min(current / limit, 1.0)
+                    st.progress(percent)
 
     # 2. Charts
     st.subheader("Expenses by Category")
