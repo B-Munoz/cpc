@@ -1,9 +1,14 @@
 import streamlit as st
 from classes import ExpenseManager, BudgetManager
 import config
+import importlib
 
+importlib.reload(config)
+
+# Then update the assignments to ensure they use reloaded data
 CATEGORIES = config.get_categories()
-# Instanciamos los managers
+
+# Instantiate the managers
 expense_manager = ExpenseManager() 
 budget_manager = BudgetManager(config.ALLOCATION_PCT, config.CATEGORY_CONFIG)
 

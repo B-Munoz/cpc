@@ -98,21 +98,27 @@ class BudgetManager:
         return get_db_engine().connect()
 
     def init_db(self):
-        with self.get_connection() as conn:
-            conn.execute(text("""
-                CREATE TABLE IF NOT EXISTS budgets (
-                    category TEXT PRIMARY KEY,
-                    current_balance REAL DEFAULT 0
-                )
-            """))
-            conn.commit()
-            
-            # Ensure categories exist
-            with conn.begin():
-                for cat in self.allocation_map.keys():
+            with self.get_connection() as conn:
+                conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS budgets (
+                        category TEXT PRIMARY KEY,
+                        current_balance REAL DEFAULT 0
+                    )
+                """))
+                conn.commit()
+                
+                with conn.begin():
+                    config_categories = list(self.allocation_map.keys())
+                    # 1. Add new categories from config
+                    for cat in config_categories:
+                        conn.execute(
+                            text("INSERT INTO budgets (category, current_balance) VALUES (:cat, 0) ON CONFLICT (category) DO NOTHING"),
+                            {"cat": cat}
+                        )
+                    # 2. Remove categories from DB that are no longer in config
                     conn.execute(
-                        text("INSERT INTO budgets (category, current_balance) VALUES (:cat, 0) ON CONFLICT (category) DO NOTHING"),
-                        {"cat": cat}
+                        text("DELETE FROM budgets WHERE category NOT IN :cats"),
+                        {"cats": tuple(config_categories)}
                     )
 
     def get_balances(self):
