@@ -1,7 +1,28 @@
-venv/
-.venv/
+# --- Security & Secrets ---
+.streamlit/secrets.toml
+**/.streamlit/secrets.toml
+.env
+**/.env
+*.key
+*.pem
+
+# --- Python & Dependencies ---
 __pycache__/
 *.pyc
-.env
-.streamlit/secrets.toml
+venv/
+.venv/
+env/
+dist/
+build/
+*.egg-info/
+
+# --- Data & Databases ---
 *.db
+*.sqlite3
+# Specifically your expense DB if it's local
+expenses.db
+**/expenses.db
+
+# --- OS Files ---
+.DS_Store
+Thumbs.db
