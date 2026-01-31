@@ -5,22 +5,28 @@ from sqlalchemy import create_engine, text
 
 # --- HELPER: Database Connection ---
 @st.cache_resource
-def get_db_engine():
-    # Looks for the secret in .streamlit/secrets.toml
-    db_info = st.secrets["connections"]["neon"]
+def get_db_engine(user_key):
+    # Dynamically fetch the secret based on user_key
+    if user_key not in st.secrets["connections"]:
+        st.error(f"User '{user_key}' not found in secrets.")
+        st.stop()
+        
+    db_info = st.secrets["connections"][user_key]
+    
+    # Handle dictionary vs string format in secrets
     if "url" in db_info:
-        # Fix protocol for SQLAlchemy
         url = db_info["url"].replace("postgres://", "postgresql://")
         return create_engine(url)
-    # Fallback if using separate fields
+    
     return create_engine(f"postgresql+psycopg2://{db_info['username']}:{db_info['password']}@{db_info['host']}/{db_info['database']}")
 
 class ExpenseManager:
-    def __init__(self):
+    def __init__(self, user_key):
+        self.user_key = user_key
         self.init_db()
 
     def get_connection(self):
-        return get_db_engine().connect()
+        return get_db_engine(self.user_key).connect()
 
     def init_db(self):
         """Initializes the table. Uses SERIAL for Postgres auto-increment."""
@@ -107,13 +113,14 @@ class ExpenseManager:
 
 
 class BudgetManager:
-    def __init__(self, allocation_map, limit_map):
+    def __init__(self, allocation_map, limit_map, user_key):
+        self.user_key = user_key
         self.allocation_map = allocation_map 
         self.limit_map = limit_map
         self.init_db()
 
     def get_connection(self):
-        return get_db_engine().connect()
+        return get_db_engine(self.user_key).connect()
 
     def init_db(self):
             with self.get_connection() as conn:

@@ -3,14 +3,20 @@ from classes import ExpenseManager, BudgetManager
 import config
 import importlib
 
-importlib.reload(config)
+# 1. Get User from URL (defaults to 'neon')
+# Example URL: app.streamlit.app/?user=gf
+query_params = st.query_params
+user_key = query_params.get("user", "neon")
 
-# Then update the assignments to ensure they use reloaded data
-CATEGORIES = config.get_categories()
+# 2. Load User-Specific Config
+user_data = config.get_user_config(user_key)
+CATEGORIES = list(user_data["CATEGORY_CONFIG"].keys())
+ALLOCATION_PCT = user_data["ALLOCATION_PCT"]
+CATEGORY_CONFIG = user_data["CATEGORY_CONFIG"]
 
-# Instantiate the managers
-expense_manager = ExpenseManager() 
-budget_manager = BudgetManager(config.ALLOCATION_PCT, config.CATEGORY_CONFIG)
+# 3. Instantiate Managers with the user key
+expense_manager = ExpenseManager(user_key) 
+budget_manager = BudgetManager(ALLOCATION_PCT, CATEGORY_CONFIG, user_key)
 
 st.set_page_config(page_title="Finance Manager", page_icon="💰")
 st.title("Personal Finance Manager")
@@ -64,7 +70,7 @@ else:
     balances = budget_manager.get_balances()
     cols = st.columns(3) 
     
-    for i, (category, limit) in enumerate(config.CATEGORY_CONFIG.items()):
+    for i, (category, limit) in enumerate(CATEGORY_CONFIG.items()):
             current = balances.get(category, 0.0)
             
             with cols[i % 3]: 
