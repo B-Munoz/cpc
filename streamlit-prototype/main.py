@@ -27,9 +27,6 @@ CATEGORY_CONFIG = dict(user_data["CATEGORY_CONFIG"])
 expense_manager = ExpenseManager(user_key=user_key) 
 budget_manager = BudgetManager(ALLOCATION_PCT, CATEGORY_CONFIG, user_key=user_key)
 
-st.set_page_config(page_title="Finance Manager", page_icon="💰")
-st.title("Personal Finance Manager")
-
 if 'df' not in st.session_state:
     st.session_state.df = expense_manager.load_data()
 
