@@ -1,22 +1,31 @@
 import streamlit as st
 from classes import ExpenseManager, BudgetManager
-import config
-import importlib
 
-# 1. Get User from URL (defaults to 'neon')
-# Example URL: app.streamlit.app/?user=gf
+st.set_page_config(page_title="Finance Manager", page_icon="💰")
+st.title("Personal Finance Manager")
+
+# --- Helper to get config from Secrets ---
+def get_user_config_from_secrets(user_key):
+    # Access the TOML structure: [user_settings] -> [user_key]
+    settings = st.secrets.get("user_settings", {})
+    # Fallback to 'neon' if user_key not found
+    return settings.get(user_key, settings.get("neon"))
+
+# 1. Get User from URL
 query_params = st.query_params
 user_key = query_params.get("user", "neon")
 
-# 2. Load User-Specific Config
-user_data = config.get_user_config(user_key)
-CATEGORIES = list(user_data["CATEGORY_CONFIG"].keys())
-ALLOCATION_PCT = user_data["ALLOCATION_PCT"]
-CATEGORY_CONFIG = user_data["CATEGORY_CONFIG"]
+# 2. Load User-Specific Config from Secrets
+user_data = get_user_config_from_secrets(user_key)
 
-# 3. Instantiate Managers with the user key
-expense_manager = ExpenseManager(user_key) 
-budget_manager = BudgetManager(ALLOCATION_PCT, CATEGORY_CONFIG, user_key)
+# Convert TOML objects to standard Python dicts/lists
+CATEGORIES = list(user_data["CATEGORY_CONFIG"].keys())
+ALLOCATION_PCT = dict(user_data["ALLOCATION_PCT"])
+CATEGORY_CONFIG = dict(user_data["CATEGORY_CONFIG"])
+
+# 3. Instantiate Managers
+expense_manager = ExpenseManager(user_key=user_key) 
+budget_manager = BudgetManager(ALLOCATION_PCT, CATEGORY_CONFIG, user_key=user_key)
 
 st.set_page_config(page_title="Finance Manager", page_icon="💰")
 st.title("Personal Finance Manager")
