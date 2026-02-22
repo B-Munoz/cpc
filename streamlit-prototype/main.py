@@ -34,7 +34,7 @@ if 'df' not in st.session_state:
 with st.sidebar:
     st.header("Add New Expense")
     with st.form("expense_form", clear_on_submit=True, enter_to_submit=False):
-        amount = st.number_input("Amount ($)", min_value=0, step=1000, value=None)
+        amount = st.number_input("Amount ($)", step=1000, value=None)
         description = st.text_input("Description")
         category = st.selectbox("Category", CATEGORIES)
         
@@ -89,7 +89,9 @@ else:
                 
                 # ONLY show progress bar if a limit exists (is greater than 0)
                 if limit > 0:
-                    percent = min(current / limit, 1.0)
+                    percent = current / limit
+                    percent = max(0.0, percent)
+                    percent = min(percent, 1.0)
                     st.progress(percent)
 
     # 2. Charts
@@ -106,7 +108,7 @@ else:
     
     edited_df = st.data_editor(
         df_display,
-        use_container_width=True,
+        width="stretch",
         num_rows="dynamic",
         column_config={
             "id": None,
